@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QPushButton, QAction,
-                             QPlainTextEdit, QMessageBox, QTableView, QHeaderView, QLabel)
+from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QPushButton, QLabel,
+                             QPlainTextEdit, QTableView, QHeaderView, QStyledItemDelegate)
 from PyQt5.QtCore import pyqtSlot, QAbstractTableModel, Qt, QVariant, QModelIndex, pyqtProperty
 from PyQt5.QtGui import QIcon
 from datetime import date, datetime, timedelta
@@ -25,6 +25,13 @@ except Exception as e:
     with open("baseOreData.json", "r") as f:
         baseOreDataDict = json.loads(f.read())
 jsonUpdateRequired = False
+
+
+class AlignDelegate(QStyledItemDelegate):
+
+    def initStyleOption(self, option, index):
+        super(AlignDelegate, self).initStyleOption(option, index)
+        option.displayAlignment = Qt.AlignRight | Qt.AlignVCenter
 
 
 class DataFrameModel(QAbstractTableModel):
@@ -112,7 +119,7 @@ class App(QMainWindow):
         self.table = QTableView(self)
         self.table.move(440, 20)
         self.table.resize(940, 530)
-        self.header = self.table.horizontalHeader()
+        # self.table.setSortingEnabled(True) # Sorting doesn't seem to work yet
 
         self.totalValueLabel = QLabel(self)
         self.totalValueLabel.move(445, 560)
@@ -166,7 +173,7 @@ class App(QMainWindow):
         icem3PerSec = float(self.icetextbox.toPlainText())
         mercoxitm3PerSec = float(self.mercoxittextbox.toPlainText())
         df = pd.read_csv(textboxValue, sep="\t", lineterminator="\n",
-                         names=["Ore", "Compressed Units", "Volume", "Distance"])
+                         names=["Ore / Ice / Goo", "Compressed Units", "Volume", "Distance"])
         df = df.drop(columns=['Volume', 'Distance'])
         try:
             df["Compressed Units"] = df["Compressed Units"].map(
@@ -174,7 +181,7 @@ class App(QMainWindow):
         except Exception as e:
             print(e)
         df[["Compressed Units"]] = df[["Compressed Units"]].apply(pd.to_numeric)
-        df = df.groupby("Ore").agg({"Compressed Units": "sum"})
+        df = df.groupby("Ore / Ice / Goo").agg({"Compressed Units": "sum"})
         for i in ["Unit Volume", "Total Volume", "Unit Value", "ISK/Hr", "Total Value"]:
             df[i] = 0.00
         for i, row in df.iterrows():
@@ -191,8 +198,8 @@ class App(QMainWindow):
             df.at[i, "Unit Volume"] = baseOreDataDict[i]["compressed_volume"]
             df.at[i, "Total Volume"] = df.at[i, "Compressed Units"] * df.at[i, "Unit Volume"]
             try:
-                dateObject = datetime.strptime(baseOreDataDict[i]["date"], "%Y-%m-%d").date().days
-                if (date.today() - dateObject) >= 5:
+                dateObject = datetime.strptime(baseOreDataDict[i]["date"], "%Y-%m-%d").date()
+                if (date.today() - dateObject).days >= 5:
                     print(f"Market data for {i} too old")
                     raise Exception("market data too old")
                 unitValue = baseOreDataDict[i]["compressed_unit_value"]
@@ -211,17 +218,23 @@ class App(QMainWindow):
                        "ISK/Hr": 2, "Total Value": 2})
         df = df.sort_values(by=["Total Value"], ascending=False)
         totalValue = format(df["Total Value"].sum(), ",.2f")
-        df["ISK/Hr"] = df["ISK/Hr"].apply("{:,.2f}".format)
-        df["Unit Value"] = df["Unit Value"].apply("{:,.2f}".format)
-        df["Total Value"] = df["Total Value"].apply("{:,.2f}".format)
+        for i in ["Compressed Units", "Unit Volume", "Total Volume",
+                  "Unit Value", "ISK/Hr", "Total Value"]:
+            if "Units" in i:
+                df[i] = df[i].apply("{:,.0f}".format)
+            else:
+                df[i] = df[i].apply("{:,.2f}".format)
         df = df.reset_index()
         model = DataFrameModel(df)
         self.table.setModel(model)
         self.totalValueLabel.setText("Total Value: " + totalValue + " ISK")
         self.totalValueLabel.setFixedWidth(500)
+        self.header = self.table.horizontalHeader()
         self.header.setSectionResizeMode(0, QHeaderView.Stretch)
+        delegate = AlignDelegate(self.table)
         for i in range(1, 7):
             self.header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            self.table.setItemDelegateForColumn(i, delegate)
         if jsonUpdateRequired:
             with open("updatedOreData.json", "w") as f:
                 json.dump(baseOreDataDict, f)
