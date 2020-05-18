@@ -182,7 +182,8 @@ class App(QMainWindow):
             print(e)
         df[["Compressed Units"]] = df[["Compressed Units"]].apply(pd.to_numeric)
         df = df.groupby("Ore / Ice / Goo").agg({"Compressed Units": "sum"})
-        for i in ["Unit Volume", "Total Volume", "Unit Value", "ISK/Hr", "Total Value"]:
+        for i in ["Unit Volume", "Total Volume", "Unit Value", "Time to Mine Out",
+                  "ISK/Hr", "Total Value"]:
             df[i] = 0.00
         for i, row in df.iterrows():
             if baseOreDataDict[i]["unit_type"] == "ice":
@@ -232,7 +233,7 @@ class App(QMainWindow):
         self.header = self.table.horizontalHeader()
         self.header.setSectionResizeMode(0, QHeaderView.Stretch)
         delegate = AlignDelegate(self.table)
-        for i in range(1, 7):
+        for i in range(1, 8):
             self.header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
             self.table.setItemDelegateForColumn(i, delegate)
         if jsonUpdateRequired:
