@@ -100,57 +100,55 @@ class App(QMainWindow):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
 
-        # Create textboxes
         self.textbox = QPlainTextEdit(self)
         self.textbox.move(20, 20)
         self.textbox.resize(400, 530)
-        self.oretextbox = QPlainTextEdit(self)
-        self.oretextbox.move(1104, 564)
-        self.oretextbox.resize(70, 25)
-        self.oretextbox.insertPlainText("22.4")
-        self.icetextbox = QPlainTextEdit(self)
-        self.icetextbox.move(1300, 564)
-        self.icetextbox.resize(70, 25)
-        self.icetextbox.insertPlainText("29.8")
-        self.mercoxittextbox = QPlainTextEdit(self)
-        self.mercoxittextbox.move(900, 564)
-        self.mercoxittextbox.resize(70, 25)
-        self.mercoxittextbox.insertPlainText("10.4")
 
-        # Create table
         self.table = QTableView(self)
         self.table.move(440, 20)
         self.table.resize(940, 530)
         self.header = self.table.horizontalHeader()
 
-        # Create buttons in the window
-        self.calculate_button = QPushButton("Calculate Value", self)
-        self.calculate_button.move(20, 560)
-        self.options_button = QPushButton("Options", self)
-        self.options_button.move(120, 560)
+        self.totalValueLabel = QLabel(self)
+        self.totalValueLabel.move(445, 560)
+        self.totalValueLabel.setText("Total Value:")
 
-        # Create labels
-        self.label = QLabel(self)
-        self.label.setText("Total Value:")
-        self.label.move(440, 560)
         self.orelabel = QLabel(self)
+        self.oretextbox = QPlainTextEdit(self)
+        self.orelabel.move(1022, 560)
+        self.oretextbox.move(1126, 564)
+        self.oretextbox.resize(70, 24)
         self.orelabel.setText("Enter your ore m3/s:")
-        self.orelabel.move(1000, 560)
+        self.oretextbox.insertPlainText("22.4")
         self.orelabel.setToolTip(
             "Default value of 22.4 m3/s based on a max skill Covetor using 2x Strip Miner I")
+
         self.icelabel = QLabel(self)
+        self.icetextbox = QPlainTextEdit(self)
+        self.icelabel.move(1210, 560)
+        self.icetextbox.move(1310, 564)
+        self.icetextbox.resize(70, 24)
         self.icelabel.setText("Enter your ice m3/s:")
-        self.icelabel.move(1200, 560)
+        self.icetextbox.insertPlainText("29.8")
         self.icelabel.setToolTip(
             "Default value of 29.8 m3/s based on a max skill Covetor using 2x Ice Harvester II")
+
         self.mercoxitlabel = QLabel(self)
-        self.mercoxitlabel.setText("Enter your mercoxit m3/s:")
-        self.mercoxitlabel.move(770, 560)
+        self.mercoxittextbox = QPlainTextEdit(self)
+        self.mercoxitlabel.move(808, 560)
         self.mercoxitlabel.setFixedWidth(130)
+        self.mercoxittextbox.move(938, 564)
+        self.mercoxittextbox.resize(70, 24)
+        self.mercoxitlabel.setText("Enter your mercoxit m3/s:")
+        self.mercoxittextbox.insertPlainText("10.4")
         self.mercoxitlabel.setToolTip(
             "Default value of 10.4 m3/s based on a max skill Covetor using 2x Modulated Deep Core Strip Miner II with no charge")
 
-        # Connect button to function on_click
+        self.calculate_button = QPushButton("Calculate Value", self)
+        self.calculate_button.move(20, 560)
+        self.options_button = QPushButton("Options", self)
+        self.options_button.move(130, 560)
+
         self.calculate_button.clicked.connect(self.on_click_calculate)
         self.show()
 
@@ -211,8 +209,8 @@ class App(QMainWindow):
         tableValue = tableValue.reset_index()
         model = DataFrameModel(tableValue)
         self.table.setModel(model)
-        self.label.setText("Total Value: " + totalValue + " ISK")
-        self.label.setFixedWidth(500)
+        self.totalValueLabel.setText("Total Value: " + totalValue + " ISK")
+        self.totalValueLabel.setFixedWidth(500)
         self.header.setSectionResizeMode(0, QHeaderView.Stretch)
         for i in range(1, 7):
             self.header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
