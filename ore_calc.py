@@ -160,23 +160,23 @@ class App(QMainWindow):
         orem3PerSec = float(self.oretextbox.toPlainText())
         icem3PerSec = float(self.icetextbox.toPlainText())
         mercoxitm3PerSec = float(self.mercoxittextbox.toPlainText())
-        tableValue = pd.read_csv(textboxValue, sep="\t", lineterminator="\n",
-                                 names=["Ore", "Compressed Units", "Volume", "Distance"])
-        tableValue = tableValue.drop(columns=['Volume', 'Distance'])
-        tableValue["Ore"] = tableValue["Ore"].map(lambda x: "Compressed " + x)
+        df = pd.read_csv(textboxValue, sep="\t", lineterminator="\n",
+                         names=["Ore", "Compressed Units", "Volume", "Distance"])
+        df = df.drop(columns=['Volume', 'Distance'])
+        df["Ore"] = df["Ore"].map(lambda x: "Compressed " + x)
         try:
-            tableValue["Compressed Units"] = tableValue["Compressed Units"].map(
+            df["Compressed Units"] = df["Compressed Units"].map(
                 lambda x: x.replace(',', ''))
         except Exception as e:
             print(e)
-        tableValue[["Compressed Units"]] = tableValue[["Compressed Units"]].apply(pd.to_numeric)
-        tableValue = tableValue.groupby("Ore").agg({"Compressed Units": "sum"})
+        df[["Compressed Units"]] = df[["Compressed Units"]].apply(pd.to_numeric)
+        df = df.groupby("Ore").agg({"Compressed Units": "sum"})
         for i in ["Unit Volume", "Total Volume", "Unit Value", "ISK/Hr", "Total Value"]:
-            tableValue[i] = 0.00
-        for i, row in tableValue.iterrows():
-            tableValue.at[i, "Compressed Units"] = tableValue.at[i, "Compressed Units"] / ore_data_dict[i]["compression_ratio"]
-            tableValue.at[i, "Unit Volume"] = ore_data_dict[i]["compressed_volume"]
-            tableValue.at[i, "Total Volume"] = tableValue.at[i, "Compressed Units"] * tableValue.at[i, "Unit Volume"]
+            df[i] = 0.00
+        for i, row in df.iterrows():
+            df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / ore_data_dict[i]["compression_ratio"]
+            df.at[i, "Unit Volume"] = ore_data_dict[i]["compressed_volume"]
+            df.at[i, "Total Volume"] = df.at[i, "Compressed Units"] * df.at[i, "Unit Volume"]
             try:
                 if (date.today() - ore_data_dict[i]["date"]).days >= 5:
                     print(f"Market data for {i} too old")
@@ -189,7 +189,7 @@ class App(QMainWindow):
                 ore_data_dict[i]["unit_value"] = unitValue
                 ore_data_dict[i]["date"] = dateObtained
                 pickleUpdateRequired = True
-            tableValue.at[i, "Unit Value"] = unitValue
+            df.at[i, "Unit Value"] = unitValue
             if ore_data_dict[i]["compression_ratio"] == 1:
                 minedCompressedUnits = icem3PerSec / ore_data_dict[i]["volume"] * 3600
             elif "Mercoxit" in i:
@@ -197,17 +197,17 @@ class App(QMainWindow):
             else:
                 minedCompressedUnits = orem3PerSec / ore_data_dict[i]["volume"] * 36
             iskPerHour = minedCompressedUnits * unitValue
-            tableValue.at[i, "ISK/Hr"] = iskPerHour
-            tableValue.at[i, "Total Value"] = tableValue.at[i, "Compressed Units"] * unitValue
-        tableValue = tableValue.round({"Unit Volume": 2, "Total Volume": 1, "Unit Value": 2,
-                                       "ISK/Hr": 2, "Total Value": 2})
-        tableValue = tableValue.sort_values(by=["Total Value"], ascending=False)
-        totalValue = format(tableValue["Total Value"].sum(), ",.2f")
-        tableValue["ISK/Hr"] = tableValue["ISK/Hr"].apply("{:,.2f}".format)
-        tableValue["Unit Value"] = tableValue["Unit Value"].apply("{:,.2f}".format)
-        tableValue["Total Value"] = tableValue["Total Value"].apply("{:,.2f}".format)
-        tableValue = tableValue.reset_index()
-        model = DataFrameModel(tableValue)
+            df.at[i, "ISK/Hr"] = iskPerHour
+            df.at[i, "Total Value"] = df.at[i, "Compressed Units"] * unitValue
+        df = df.round({"Unit Volume": 2, "Total Volume": 1, "Unit Value": 2,
+                       "ISK/Hr": 2, "Total Value": 2})
+        df = df.sort_values(by=["Total Value"], ascending=False)
+        totalValue = format(df["Total Value"].sum(), ",.2f")
+        df["ISK/Hr"] = df["ISK/Hr"].apply("{:,.2f}".format)
+        df["Unit Value"] = df["Unit Value"].apply("{:,.2f}".format)
+        df["Total Value"] = df["Total Value"].apply("{:,.2f}".format)
+        df = df.reset_index()
+        model = DataFrameModel(df)
         self.table.setModel(model)
         self.totalValueLabel.setText("Total Value: " + totalValue + " ISK")
         self.totalValueLabel.setFixedWidth(500)
