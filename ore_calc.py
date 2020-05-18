@@ -125,6 +125,11 @@ class App(QMainWindow):
         self.totalValueLabel.move(445, 560)
         self.totalValueLabel.setText("Total Value:")
 
+        self.timeToMineLabel = QLabel(self)
+        self.timeToMineLabel.move(640, 560)
+        self.timeToMineLabel.setText("Total TTMO:")
+        self.timeToMineLabel.setToolTip("Total time to mine out the scanned ore / ice / goo")
+
         self.orelabel = QLabel(self)
         self.oretextbox = QPlainTextEdit(self)
         self.orelabel.move(1022, 560)
@@ -186,18 +191,25 @@ class App(QMainWindow):
                   "ISK/Hr", "Total Value"]:
             df[i] = 0.00
         for i, row in df.iterrows():
+            iterVolume = baseOreDataDict[i]["volume"]
+            iterUnits = df.at[i, "Compressed Units"]
             if baseOreDataDict[i]["unit_type"] == "ice":
-                minedCompressedUnits = icem3PerSec / baseOreDataDict[i]["volume"] * 3600
+                minedCompressedUnits = icem3PerSec / iterVolume * 3600
+                timeToMineOut = iterUnits * iterVolume / icem3PerSec
             elif baseOreDataDict[i]["unit_type"] == "mercoxit":
-                minedCompressedUnits = mercoxitm3PerSec / baseOreDataDict[i]["volume"] * 36
-                df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / 100
+                minedCompressedUnits = mercoxitm3PerSec / iterVolume * 36
+                timeToMineOut = iterUnits * iterVolume / mercoxitm3PerSec
+                df.at[i, "Compressed Units"] = iterUnits / 100
             elif baseOreDataDict[i]["unit_type"] == "moon_goo":
-                minedCompressedUnits = orem3PerSec / baseOreDataDict[i]["volume"] * 3600
+                minedCompressedUnits = orem3PerSec / iterVolume * 3600
+                timeToMineOut = iterUnits * iterVolume / orem3PerSec
             else:
-                minedCompressedUnits = orem3PerSec / baseOreDataDict[i]["volume"] * 36
-                df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / 100
+                minedCompressedUnits = orem3PerSec / iterVolume * 36
+                timeToMineOut = iterUnits * iterVolume / orem3PerSec
+                df.at[i, "Compressed Units"] = iterUnits / 100
             df.at[i, "Unit Volume"] = baseOreDataDict[i]["compressed_volume"]
-            df.at[i, "Total Volume"] = df.at[i, "Compressed Units"] * df.at[i, "Unit Volume"]
+            df.at[i, "Total Volume"] = iterUnits * df.at[i, "Unit Volume"]
+            df.at[i, "Time to Mine Out"] = timeToMineOut
             try:
                 dateObject = datetime.strptime(baseOreDataDict[i]["date"], "%Y-%m-%d").date()
                 if (date.today() - dateObject).days >= 5:
@@ -215,14 +227,18 @@ class App(QMainWindow):
             iskPerHour = minedCompressedUnits * unitValue
             df.at[i, "ISK/Hr"] = iskPerHour
             df.at[i, "Total Value"] = df.at[i, "Compressed Units"] * unitValue
-        df = df.round({"Unit Volume": 2, "Total Volume": 1, "Unit Value": 2,
+        df = df.round({"Unit Volume": 2, "Total Volume": 1, "Unit Value": 2, "Time to Mine Out": 0,
                        "ISK/Hr": 2, "Total Value": 2})
         df = df.sort_values(by=["Total Value"], ascending=False)
+        seconds = df["Time to Mine Out"].sum()
+        totalTimeToMineOut = "%dh %02dm %02ds" % (seconds / 3600, seconds / 60 % 60, seconds % 60)
         totalValue = format(df["Total Value"].sum(), ",.2f")
-        for i in ["Compressed Units", "Unit Volume", "Total Volume",
+        for i in ["Compressed Units", "Unit Volume", "Total Volume", "Time to Mine Out",
                   "Unit Value", "ISK/Hr", "Total Value"]:
             if "Units" in i:
                 df[i] = df[i].apply("{:,.0f}".format)
+            elif i == "Time to Mine Out":
+                df[i] = df[i].apply(lambda x: "%dh %02dm %02ds" % (x / 3600, x / 60 % 60, x % 60))
             else:
                 df[i] = df[i].apply("{:,.2f}".format)
         df = df.reset_index()
@@ -230,6 +246,8 @@ class App(QMainWindow):
         self.table.setModel(model)
         self.totalValueLabel.setText("Total Value: " + totalValue + " ISK")
         self.totalValueLabel.setFixedWidth(500)
+        self.timeToMineLabel.setText("Total TTMO: " + totalTimeToMineOut)
+        self.timeToMineLabel.setFixedWidth(250)
         self.header = self.table.horizontalHeader()
         self.header.setSectionResizeMode(0, QHeaderView.Stretch)
         delegate = AlignDelegate(self.table)
