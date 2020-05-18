@@ -1,8 +1,6 @@
-from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QPushButton,
-                             QAction, QPlainTextEdit, QMessageBox, QTableView,
-                             QHeaderView, QLabel)
-from PyQt5.QtCore import (pyqtSlot, QAbstractTableModel, Qt, QVariant,
-                          QModelIndex, pyqtProperty)
+from PyQt5.QtWidgets import (QMainWindow, QApplication, QWidget, QPushButton, QAction,
+                             QPlainTextEdit, QMessageBox, QTableView, QHeaderView, QLabel)
+from PyQt5.QtCore import pyqtSlot, QAbstractTableModel, Qt, QVariant, QModelIndex, pyqtProperty
 from PyQt5.QtGui import QIcon
 from datetime import date, datetime, timedelta
 from pprint import pprint
@@ -12,23 +10,16 @@ import requests
 import pickle
 import sys
 
-requestHeaders = {
-    "User-Agent": "Asteroid appraiser by vjackrussel@gmail.com"}
+requestHeaders = {"User-Agent": "Asteroid appraiser by vjackrussel@gmail.com"}
 requestBase = "https://esi.evetech.net/latest/markets/"
 requestBridge = "/history/?datasource=tranquility&type_id="
 theForgeRegionId = 10000002
 delveRegionId = 10000060
 regionId = theForgeRegionId
+
 with open("ore_data_dict.pkl", "rb") as f:
     ore_data_dict = pickle.load(f)
-pickle_update_required = False
-
-
-def getMarketValue(typeIdInput):
-    request_string = (f"{requestBase}{regionId}{requestBridge}{typeIdInput}")
-    result = requests.get(request_string, headers=requestHeaders).json()[-2]
-    return result["average"], datetime.strptime(result["date"],
-                                                "%Y-%m-%d").date()
+pickleUpdateRequired = False
 
 
 class DataFrameModel(QAbstractTableModel):
@@ -50,8 +41,7 @@ class DataFrameModel(QAbstractTableModel):
     dataFrame = pyqtProperty(pd.DataFrame, fget=dataFrame, fset=setDataFrame)
 
     @pyqtSlot(int, Qt.Orientation, result=str)
-    def headerData(self, section: int, orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole):
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole):
         if role == Qt.DisplayRole:
             if orientation == Qt.Horizontal:
                 return self._dataframe.columns[section]
@@ -166,86 +156,76 @@ class App(QMainWindow):
 
     @pyqtSlot()
     def on_click_calculate(self):
-        global pickle_update_required
+        global pickleUpdateRequired
         textboxValue = self.textbox.toPlainText()
         textboxValue = StringIO(textboxValue)
-        ore_m3_per_sec = float(self.oretextbox.toPlainText())
-        ice_m3_per_sec = float(self.icetextbox.toPlainText())
-        mercoxit_m3_per_sec = float(self.mercoxittextbox.toPlainText())
+        orem3PerSec = float(self.oretextbox.toPlainText())
+        icem3PerSec = float(self.icetextbox.toPlainText())
+        mercoxitm3PerSec = float(self.mercoxittextbox.toPlainText())
         tableValue = pd.read_csv(textboxValue, sep="\t", lineterminator="\n",
-                                 names=["Ore", "Compressed Units",
-                                        "Volume", "Distance"])
+                                 names=["Ore", "Compressed Units", "Volume", "Distance"])
         tableValue = tableValue.drop(columns=['Volume', 'Distance'])
-        tableValue["Ore"] = tableValue["Ore"].map(
-            lambda x: "Compressed " + x)
+        tableValue["Ore"] = tableValue["Ore"].map(lambda x: "Compressed " + x)
         try:
             tableValue["Compressed Units"] = tableValue["Compressed Units"].map(
                 lambda x: x.replace(',', ''))
         except Exception as e:
             print(e)
-        tableValue[["Compressed Units"]] = tableValue[[
-            "Compressed Units"]].apply(pd.to_numeric)
-        tableValue = tableValue.groupby(
-            "Ore").agg({"Compressed Units": "sum"})
-        for i in ["Unit Volume", "Total Volume", "Unit Value", "ISK/Hr",
-                  "Total Value"]:
+        tableValue[["Compressed Units"]] = tableValue[["Compressed Units"]].apply(pd.to_numeric)
+        tableValue = tableValue.groupby("Ore").agg({"Compressed Units": "sum"})
+        for i in ["Unit Volume", "Total Volume", "Unit Value", "ISK/Hr", "Total Value"]:
             tableValue[i] = 0.00
         for i, row in tableValue.iterrows():
-            tableValue.at[i, "Compressed Units"] = tableValue.at[i,
-                                                                 "Compressed Units"] / ore_data_dict[i]["compression_ratio"]
-            tableValue.at[i,
-                          "Unit Volume"] = ore_data_dict[i]["compressed_volume"]
-            tableValue.at[i, "Total Volume"] = tableValue.at[i,
-                                                             "Compressed Units"] * tableValue.at[i, "Unit Volume"]
+            tableValue.at[i, "Compressed Units"] = tableValue.at[i, "Compressed Units"] / ore_data_dict[i]["compression_ratio"]
+            tableValue.at[i, "Unit Volume"] = ore_data_dict[i]["compressed_volume"]
+            tableValue.at[i, "Total Volume"] = tableValue.at[i, "Compressed Units"] * tableValue.at[i, "Unit Volume"]
             try:
                 if (date.today() - ore_data_dict[i]["date"]).days >= 5:
                     print(f"Market data for {i} too old")
                     raise Exception("market data too old")
-                unit_value = ore_data_dict[i]["unit_value"]
+                unitValue = ore_data_dict[i]["unit_value"]
             except Exception as e:
                 print(e)
                 print(f"Fetching market data for {i}")
-                unit_value, date_obtained = getMarketValue(
-                    ore_data_dict[i]["type_id"])
-                ore_data_dict[i]["unit_value"] = unit_value
-                ore_data_dict[i]["date"] = date_obtained
-                pickle_update_required = True
-            tableValue.at[i, "Unit Value"] = unit_value
+                unitValue, dateObtained = getMarketValue(ore_data_dict[i]["type_id"])
+                ore_data_dict[i]["unit_value"] = unitValue
+                ore_data_dict[i]["date"] = dateObtained
+                pickleUpdateRequired = True
+            tableValue.at[i, "Unit Value"] = unitValue
             if ore_data_dict[i]["compression_ratio"] == 1:
-                mined_compressed_units = ice_m3_per_sec / \
-                    ore_data_dict[i]["volume"] * 3600
+                minedCompressedUnits = icem3PerSec / ore_data_dict[i]["volume"] * 3600
             elif "Mercoxit" in i:
-                mined_compressed_units = mercoxit_m3_per_sec / \
-                    ore_data_dict[i]["volume"] * 36
+                minedCompressedUnits = mercoxitm3PerSec / ore_data_dict[i]["volume"] * 36
             else:
-                mined_compressed_units = ore_m3_per_sec / \
-                    ore_data_dict[i]["volume"] * 36
-            isk_per_hour = mined_compressed_units * unit_value
-            tableValue.at[i, "ISK/Hr"] = isk_per_hour
-            tableValue.at[i, "Total Value"] = tableValue.at[i,
-                                                            "Compressed Units"] * unit_value
-        tableValue = tableValue.round(
-            {"Unit Volume": 2, "Total Volume": 1, "Unit Value": 2, "ISK/Hr": 2, "Total Value": 2})
-        tableValue = tableValue.sort_values(
-            by=["Total Value"], ascending=False)
-        total_value = format(tableValue["Total Value"].sum(), ",.2f")
+                minedCompressedUnits = orem3PerSec / ore_data_dict[i]["volume"] * 36
+            iskPerHour = minedCompressedUnits * unitValue
+            tableValue.at[i, "ISK/Hr"] = iskPerHour
+            tableValue.at[i, "Total Value"] = tableValue.at[i, "Compressed Units"] * unitValue
+        tableValue = tableValue.round({"Unit Volume": 2, "Total Volume": 1, "Unit Value": 2,
+                                       "ISK/Hr": 2, "Total Value": 2})
+        tableValue = tableValue.sort_values(by=["Total Value"], ascending=False)
+        totalValue = format(tableValue["Total Value"].sum(), ",.2f")
         tableValue["ISK/Hr"] = tableValue["ISK/Hr"].apply("{:,.2f}".format)
-        tableValue["Unit Value"] = tableValue["Unit Value"].apply(
-            "{:,.2f}".format)
-        tableValue["Total Value"] = tableValue["Total Value"].apply(
-            "{:,.2f}".format)
+        tableValue["Unit Value"] = tableValue["Unit Value"].apply("{:,.2f}".format)
+        tableValue["Total Value"] = tableValue["Total Value"].apply("{:,.2f}".format)
         tableValue = tableValue.reset_index()
         model = DataFrameModel(tableValue)
         self.table.setModel(model)
-        self.label.setText("Total Value: " + total_value + " ISK")
+        self.label.setText("Total Value: " + totalValue + " ISK")
         self.label.setFixedWidth(500)
         self.header.setSectionResizeMode(0, QHeaderView.Stretch)
         for i in range(1, 7):
             self.header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-        if pickle_update_required:
+        if pickleUpdateRequired:
             with open("ore_data_dict.pkl", "wb") as f:
                 pickle.dump(ore_data_dict, f, pickle.HIGHEST_PROTOCOL)
-            pickle_update_required = False
+            pickleUpdateRequired = False
+
+
+def getMarketValue(typeIdInput):
+    request_string = (f"{requestBase}{regionId}{requestBridge}{typeIdInput}")
+    result = requests.get(request_string, headers=requestHeaders).json()[-2]
+    return result["average"], datetime.strptime(result["date"], "%Y-%m-%d").date()
 
 
 if __name__ == "__main__":
