@@ -17,8 +17,13 @@ theForgeRegionId = 10000002
 delveRegionId = 10000060
 regionId = theForgeRegionId
 
-with open("baseOreData.json", "r") as f:
-    baseOreDataDict = json.loads(f.read())
+try:
+    with open("updatedOreData.json", "r") as f:
+        baseOreDataDict = json.loads(f.read())
+except Exception as e:
+    print(e, "No updatedOreData, loading baseOreData")
+    with open("baseOreData.json", "r") as f:
+        baseOreDataDict = json.loads(f.read())
 jsonUpdateRequired = False
 
 
@@ -163,7 +168,6 @@ class App(QMainWindow):
         df = pd.read_csv(textboxValue, sep="\t", lineterminator="\n",
                          names=["Ore", "Compressed Units", "Volume", "Distance"])
         df = df.drop(columns=['Volume', 'Distance'])
-        df["Ore"] = df["Ore"].map(lambda x: "Compressed " + x)
         try:
             df["Compressed Units"] = df["Compressed Units"].map(
                 lambda x: x.replace(',', ''))
@@ -174,7 +178,16 @@ class App(QMainWindow):
         for i in ["Unit Volume", "Total Volume", "Unit Value", "ISK/Hr", "Total Value"]:
             df[i] = 0.00
         for i, row in df.iterrows():
-            df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / baseOreDataDict[i]["compression_ratio"]
+            if baseOreDataDict[i]["unit_type"] == "ice":
+                minedCompressedUnits = icem3PerSec / baseOreDataDict[i]["volume"] * 3600
+            elif baseOreDataDict[i]["unit_type"] == "mercoxit":
+                minedCompressedUnits = mercoxitm3PerSec / baseOreDataDict[i]["volume"] * 36
+                df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / 100
+            elif baseOreDataDict[i]["unit_type"] == "moon_goo":
+                minedCompressedUnits = orem3PerSec / baseOreDataDict[i]["volume"] * 3600
+            else:
+                minedCompressedUnits = orem3PerSec / baseOreDataDict[i]["volume"] * 36
+                df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / 100
             df.at[i, "Unit Volume"] = baseOreDataDict[i]["compressed_volume"]
             df.at[i, "Total Volume"] = df.at[i, "Compressed Units"] * df.at[i, "Unit Volume"]
             try:
@@ -182,21 +195,15 @@ class App(QMainWindow):
                 if (date.today() - dateObject) >= 5:
                     print(f"Market data for {i} too old")
                     raise Exception("market data too old")
-                unitValue = baseOreDataDict[i]["unit_value"]
+                unitValue = baseOreDataDict[i]["compressed_unit_value"]
             except Exception as e:
                 print(e)
                 print(f"Fetching market data for {i}")
-                unitValue, dateObtained = getMarketValue(baseOreDataDict[i]["type_id"])
-                baseOreDataDict[i]["unit_value"] = unitValue
+                unitValue, dateObtained = getMarketValue(baseOreDataDict[i]["compressed_type_id"])
+                baseOreDataDict[i]["compressed_unit_value"] = unitValue
                 baseOreDataDict[i]["date"] = dateObtained
                 jsonUpdateRequired = True
             df.at[i, "Unit Value"] = unitValue
-            if baseOreDataDict[i]["compression_ratio"] == 1:
-                minedCompressedUnits = icem3PerSec / baseOreDataDict[i]["volume"] * 3600
-            elif "Mercoxit" in i:
-                minedCompressedUnits = mercoxitm3PerSec / baseOreDataDict[i]["volume"] * 36
-            else:
-                minedCompressedUnits = orem3PerSec / baseOreDataDict[i]["volume"] * 36
             iskPerHour = minedCompressedUnits * unitValue
             df.at[i, "ISK/Hr"] = iskPerHour
             df.at[i, "Total Value"] = df.at[i, "Compressed Units"] * unitValue
@@ -216,7 +223,7 @@ class App(QMainWindow):
         for i in range(1, 7):
             self.header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
         if jsonUpdateRequired:
-            with open("baseOreData.json", "w") as f:
+            with open("updatedOreData.json", "w") as f:
                 json.dump(baseOreDataDict, f)
             jsonUpdateRequired = False
 
