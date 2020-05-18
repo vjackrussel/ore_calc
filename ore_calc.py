@@ -7,7 +7,7 @@ from pprint import pprint
 from io import StringIO
 import pandas as pd
 import requests
-import pickle
+import json
 import sys
 
 requestHeaders = {"User-Agent": "Asteroid appraiser by vjackrussel@gmail.com"}
@@ -17,9 +17,9 @@ theForgeRegionId = 10000002
 delveRegionId = 10000060
 regionId = theForgeRegionId
 
-with open("ore_data_dict.pkl", "rb") as f:
-    ore_data_dict = pickle.load(f)
-pickleUpdateRequired = False
+with open("baseOreData.json", "r") as f:
+    baseOreDataDict = json.loads(f.read())
+jsonUpdateRequired = False
 
 
 class DataFrameModel(QAbstractTableModel):
@@ -154,7 +154,7 @@ class App(QMainWindow):
 
     @pyqtSlot()
     def on_click_calculate(self):
-        global pickleUpdateRequired
+        global jsonUpdateRequired
         textboxValue = self.textbox.toPlainText()
         textboxValue = StringIO(textboxValue)
         orem3PerSec = float(self.oretextbox.toPlainText())
@@ -174,28 +174,29 @@ class App(QMainWindow):
         for i in ["Unit Volume", "Total Volume", "Unit Value", "ISK/Hr", "Total Value"]:
             df[i] = 0.00
         for i, row in df.iterrows():
-            df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / ore_data_dict[i]["compression_ratio"]
-            df.at[i, "Unit Volume"] = ore_data_dict[i]["compressed_volume"]
+            df.at[i, "Compressed Units"] = df.at[i, "Compressed Units"] / baseOreDataDict[i]["compression_ratio"]
+            df.at[i, "Unit Volume"] = baseOreDataDict[i]["compressed_volume"]
             df.at[i, "Total Volume"] = df.at[i, "Compressed Units"] * df.at[i, "Unit Volume"]
             try:
-                if (date.today() - ore_data_dict[i]["date"]).days >= 5:
+                dateObject = datetime.strptime(baseOreDataDict[i]["date"], "%Y-%m-%d").date().days
+                if (date.today() - dateObject) >= 5:
                     print(f"Market data for {i} too old")
                     raise Exception("market data too old")
-                unitValue = ore_data_dict[i]["unit_value"]
+                unitValue = baseOreDataDict[i]["unit_value"]
             except Exception as e:
                 print(e)
                 print(f"Fetching market data for {i}")
-                unitValue, dateObtained = getMarketValue(ore_data_dict[i]["type_id"])
-                ore_data_dict[i]["unit_value"] = unitValue
-                ore_data_dict[i]["date"] = dateObtained
-                pickleUpdateRequired = True
+                unitValue, dateObtained = getMarketValue(baseOreDataDict[i]["type_id"])
+                baseOreDataDict[i]["unit_value"] = unitValue
+                baseOreDataDict[i]["date"] = dateObtained
+                jsonUpdateRequired = True
             df.at[i, "Unit Value"] = unitValue
-            if ore_data_dict[i]["compression_ratio"] == 1:
-                minedCompressedUnits = icem3PerSec / ore_data_dict[i]["volume"] * 3600
+            if baseOreDataDict[i]["compression_ratio"] == 1:
+                minedCompressedUnits = icem3PerSec / baseOreDataDict[i]["volume"] * 3600
             elif "Mercoxit" in i:
-                minedCompressedUnits = mercoxitm3PerSec / ore_data_dict[i]["volume"] * 36
+                minedCompressedUnits = mercoxitm3PerSec / baseOreDataDict[i]["volume"] * 36
             else:
-                minedCompressedUnits = orem3PerSec / ore_data_dict[i]["volume"] * 36
+                minedCompressedUnits = orem3PerSec / baseOreDataDict[i]["volume"] * 36
             iskPerHour = minedCompressedUnits * unitValue
             df.at[i, "ISK/Hr"] = iskPerHour
             df.at[i, "Total Value"] = df.at[i, "Compressed Units"] * unitValue
@@ -214,16 +215,16 @@ class App(QMainWindow):
         self.header.setSectionResizeMode(0, QHeaderView.Stretch)
         for i in range(1, 7):
             self.header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-        if pickleUpdateRequired:
-            with open("ore_data_dict.pkl", "wb") as f:
-                pickle.dump(ore_data_dict, f, pickle.HIGHEST_PROTOCOL)
-            pickleUpdateRequired = False
+        if jsonUpdateRequired:
+            with open("baseOreData.json", "w") as f:
+                json.dump(baseOreDataDict, f)
+            jsonUpdateRequired = False
 
 
 def getMarketValue(typeIdInput):
     request_string = (f"{requestBase}{regionId}{requestBridge}{typeIdInput}")
     result = requests.get(request_string, headers=requestHeaders).json()[-2]
-    return result["average"], datetime.strptime(result["date"], "%Y-%m-%d").date()
+    return result["average"], result["date"]
 
 
 if __name__ == "__main__":
