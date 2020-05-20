@@ -213,8 +213,7 @@ class App(QMainWindow):
             try:
                 dateObject = datetime.strptime(baseOreDataDict[i]["date"], "%Y-%m-%d").date()
                 if (date.today() - dateObject).days >= 5:
-                    print(f"Market data for {i} too old")
-                    raise Exception("market data too old")
+                    raise Exception(f"Market data for {i} too old")
                 unitValue = baseOreDataDict[i]["compressed_unit_value"]
             except Exception as e:
                 print(e)
